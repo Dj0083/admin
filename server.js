@@ -1,14 +1,12 @@
-// server.js
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql');
 const bodyParser = require('body-parser');
-const connection = require('./db');
-const app = express();
 const path = require('path');
-
+const ejs = require('ejs');
 const app = express();
 const port = 3000;
+
 // Database connection
 const db = mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
@@ -25,10 +23,17 @@ db.connect((err) => {
     console.log('Connected to the database.');
 });
 
+// Middleware
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Set EJS as the templating engine
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
 // Home route: Fetch donors and donation history
 app.get('/', (req, res) => {
     const getDonorsQuery = 'SELECT id, name, blood_type FROM donors ORDER BY name ASC';
-
     db.query(getDonorsQuery, (err, donors) => {
         if (err) throw err;
         res.render('donation_management', { donors, selectedDonor: null, donationHistory: [] });
@@ -67,44 +72,21 @@ app.post('/add-donation', (req, res) => {
     });
 });
 
-// Template engine logic: Render EJS directly
-app.engine('html', require('ejs').renderFile);
-app.set('view engine', 'html');
-
-// Serve static files and render donation management page
-app.get('/', (req, res) => {
-    res.render(
-        `<html>
-        <head>
-            <title>Donation Management</title>
-            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-        </head>
-        <body>
-            <div class="container">
-                <h2 class="text-center">Donation Management</h2>
-                <form method="POST" action="/view-history" class="mb-4">
-                    <div class="mb-3">
-                        <label>Select Donor</label>
-                    </div>
-                </div>
-              </style>
-          `
-    );
+// View donors
+app.get('/view-donors', (req, res) => {
+    db.query('SELECT * FROM donors', (err, results) => {
+        if (err) {
+            return res.send('Error fetching donors');
+        }
+        res.render('view-donors', { donors: results });
+    });
 });
 
-// Middleware
-app.use(bodyParser.urlencoded({ extended: false }));
-app.set('view engine', 'ejs');
-app.use(express.static('public'));
-
-// Routes
-
-// Add or Edit Donor
+// Edit donor
 app.get('/edit-donor', (req, res) => {
     const donorId = req.query.id;
     if (donorId) {
-        // Fetch donor details from the database
-        connection.query('SELECT * FROM donors WHERE id = ?', [donorId], (err, results) => {
+        db.query('SELECT * FROM donors WHERE id = ?', [donorId], (err, results) => {
             if (err) {
                 return res.send('Error fetching donor data');
             }
@@ -119,13 +101,12 @@ app.get('/edit-donor', (req, res) => {
     }
 });
 
-// Handle form submission (Add/Update)
+// Handle form submission (Add/Update donor)
 app.post('/edit-donor', (req, res) => {
     const { name, email, phone_number, blood_type, last_donation, donor_id } = req.body;
 
     if (donor_id) {
-        // Update donor data
-        connection.query(
+        db.query(
             'UPDATE donors SET name = ?, email = ?, phone_number = ?, blood_type = ?, last_donation = ? WHERE id = ?',
             [name, email, phone_number, blood_type, last_donation, donor_id],
             (err, results) => {
@@ -136,8 +117,7 @@ app.post('/edit-donor', (req, res) => {
             }
         );
     } else {
-        // Add new donor data
-        connection.query(
+        db.query(
             'INSERT INTO donors (name, email, phone_number, blood_type, last_donation) VALUES (?, ?, ?, ?, ?)',
             [name, email, phone_number, blood_type, last_donation],
             (err, results) => {
@@ -150,76 +130,7 @@ app.post('/edit-donor', (req, res) => {
     }
 });
 
-// View Donors
-app.get('/view-donors', (req, res) => {
-    connection.query('SELECT * FROM donors', (err, results) => {
-        if (err) {
-            return res.send('Error fetching donors');
-        }
-        res.render('view-donors', { donors: results });
-    });
-});
-
-// Start the server
-app.listen(3000, () => {
-    console.log('Server is running on http://localhost:3000');
-});
-
-// Set up body-parser middleware for handling POST requests
-app.use(bodyParser.urlencoded({ extended: true }));
-
-// Set EJS as the templating engine
-app.set('view engine', 'ejs');
-
-// Serve static files (e.g., Bootstrap)
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Route to Edit Staff Information
-app.get('/edit-staff/:staff_id', (req, res) => {
-    const staff_id = req.params.staff_id;
-
-    const sql = 'SELECT * FROM staff WHERE staff_id = ?';
-    connection.query(sql, [staff_id], (err, result) => {
-        if (err) {
-            res.send('Error fetching staff details: ' + err);
-            return;
-        }
-
-        if (result.length === 0) {
-            res.send('Staff not found!');
-            return;
-        }
-
-        res.render('editStaff', { staff: result[0] });
-    });
-});
-
-// Route to Update Staff Information
-app.post('/edit-staff/:staff_id', (req, res) => {
-    const { name, role, contact_number, email, status } = req.body;
-    const staff_id = req.params.staff_id;
-
-    const sql = `UPDATE staff SET name = ?, role = ?, contact_number = ?, email = ?, status = ? WHERE staff_id = ?`;
-
-    connection.query(sql, [name, role, contact_number, email, status, staff_id], (err, result) => {
-        if (err) {
-            res.send('Error updating staff: ' + err);
-            return;
-        }
-
-        res.send('<div class="alert alert-success" role="alert">Staff updated successfully.</div>');
-    });
-});
-
-// Start the server
-app.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
-});
-
-// Serve static files (for CSS, JS)
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Blood Stock Monitoring Route
+// Blood Stock Management
 app.get('/monitor_blood_stock', (req, res) => {
     const sql = 'SELECT * FROM blood_stock';
     db.query(sql, (err, result) => {
@@ -231,60 +142,10 @@ app.get('/monitor_blood_stock', (req, res) => {
     });
 });
 
-// Start server
-app.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
-});
-
-// Set up EJS for templating
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-
-// Middleware to parse POST data
-app.use(express.urlencoded({ extended: true }));
-
-// Route to display staff list
-app.get('/staff_list', (req, res) => {
-    const sql = 'SELECT * FROM staff';
-    db.query(sql, (err, result) => {
-        if (err) {
-            console.error('Error fetching staff data: ' + err.stack);
-            return res.status(500).send('Error fetching data');
-        }
-        res.render('staff_list', { staff: result });
-    });
-});
-
-// Route to delete staff (implement deletion logic if needed)
-app.get('/staff_list/delete/:staff_id', (req, res) => {
-    const { staff_id } = req.params;
-    const deleteQuery = `DELETE FROM staff WHERE staff_id = ?`;
-
-    db.query(deleteQuery, [staff_id], (err, result) => {
-        if (err) {
-            console.error('Error deleting staff: ' + err.stack);
-            return res.status(500).send('Error deleting staff');
-        }
-        res.redirect('/staff_list');
-    });
-});
-
-// Start server
-app.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
-});
-// Set up EJS for templating
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-
-// Middleware to parse POST data
-app.use(express.urlencoded({ extended: true }));
-
-// Route to add or update blood stock
+// Add or update blood stock
 app.post('/update_blood_stock', (req, res) => {
     const { blood_type, units_change } = req.body;
 
-    // Check if the blood type already exists
     const sql = 'SELECT * FROM blood_stock WHERE blood_type = ?';
     db.query(sql, [blood_type], (err, result) => {
         if (err) {
@@ -294,7 +155,6 @@ app.post('/update_blood_stock', (req, res) => {
 
         let message = '';
         if (result.length > 0) {
-            // Update the existing record (Add or Remove stock)
             const current_units = result[0].units_available;
             const new_units = current_units + parseInt(units_change);
 
@@ -312,7 +172,6 @@ app.post('/update_blood_stock', (req, res) => {
                 });
             }
         } else {
-            // Add new blood type record if it doesn't exist
             if (parseInt(units_change) > 0) {
                 const insertSql = 'INSERT INTO blood_stock (blood_type, units_available) VALUES (?, ?)';
                 db.query(insertSql, [blood_type, units_change], (err) => {
@@ -329,11 +188,6 @@ app.post('/update_blood_stock', (req, res) => {
             }
         }
     });
-});
-
-// Route to render the form
-app.get('/update_blood_stock', (req, res) => {
-    res.render('update_blood_stock', { message: '' });
 });
 
 // Start the server
