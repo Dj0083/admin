@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add/Update Blood Stock</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="container my-4">
+    <h2 class="text-center">Add/Update Blood Stock</h2>
+
+    <!-- Display success/error message -->
+    <% if (message) { %>
+        <div class="alert alert-info"><%= message %></div>
+    <% } %>
+
+    <!-- Blood Stock Form -->
+    <form method="POST" action="/update_blood_stock">
+        <div class="mb-3">
+            <label for="blood_type" class="form-label">Blood Type</label>
+            <input type="text" class="form-control" id="blood_type" name="blood_type" required>
+        </div>
+        <div class="mb-3">
+            <label for="units_change" class="form-label">Units to Add/Remove</label>
+            <input type="number" class="form-control" id="units_change" name="units_change" required>
+            <small class="form-text text-muted">Enter a positive number to add or a negative number to remove units.</small>
+        </div>
+        <button type="submit" class="btn btn-primary">Add/Update Stock</button>
+    </form>
+
+    <hr>
+    <a href="monitor_blood_stock" class="btn btn-secondary">Back to Blood Stock Monitoring</a>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
+
+</body>
+</html>
