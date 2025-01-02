@@ -14,7 +14,7 @@ const db = mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'your_database_name',
+    database: process.env.DB_NAME || 'database',
 });
 
 db.connect((err) => {
@@ -228,6 +228,44 @@ app.get('/monitor_blood_stock', (req, res) => {
             return res.status(500).send('Error fetching data');
         }
         res.render('monitor_blood_stock', { bloodStock: result });
+    });
+});
+
+// Start server
+app.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}`);
+});
+
+// Set up EJS for templating
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+// Middleware to parse POST data
+app.use(express.urlencoded({ extended: true }));
+
+// Route to display staff list
+app.get('/staff_list', (req, res) => {
+    const sql = 'SELECT * FROM staff';
+    db.query(sql, (err, result) => {
+        if (err) {
+            console.error('Error fetching staff data: ' + err.stack);
+            return res.status(500).send('Error fetching data');
+        }
+        res.render('staff_list', { staff: result });
+    });
+});
+
+// Route to delete staff (implement deletion logic if needed)
+app.get('/staff_list/delete/:staff_id', (req, res) => {
+    const { staff_id } = req.params;
+    const deleteQuery = `DELETE FROM staff WHERE staff_id = ?`;
+
+    db.query(deleteQuery, [staff_id], (err, result) => {
+        if (err) {
+            console.error('Error deleting staff: ' + err.stack);
+            return res.status(500).send('Error deleting staff');
+        }
+        res.redirect('/staff_list');
     });
 });
 
