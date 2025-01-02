@@ -273,3 +273,70 @@ app.get('/staff_list/delete/:staff_id', (req, res) => {
 app.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`);
 });
+// Set up EJS for templating
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+// Middleware to parse POST data
+app.use(express.urlencoded({ extended: true }));
+
+// Route to add or update blood stock
+app.post('/update_blood_stock', (req, res) => {
+    const { blood_type, units_change } = req.body;
+
+    // Check if the blood type already exists
+    const sql = 'SELECT * FROM blood_stock WHERE blood_type = ?';
+    db.query(sql, [blood_type], (err, result) => {
+        if (err) {
+            console.error('Error fetching blood stock: ' + err.stack);
+            return res.status(500).send('Error fetching data');
+        }
+
+        let message = '';
+        if (result.length > 0) {
+            // Update the existing record (Add or Remove stock)
+            const current_units = result[0].units_available;
+            const new_units = current_units + parseInt(units_change);
+
+            if (new_units < 0) {
+                message = "Error: Insufficient stock to remove.";
+            } else {
+                const updateSql = 'UPDATE blood_stock SET units_available = ?, last_updated = NOW() WHERE blood_type = ?';
+                db.query(updateSql, [new_units, blood_type], (err) => {
+                    if (err) {
+                        console.error('Error updating record: ' + err.stack);
+                        return res.status(500).send('Error updating record');
+                    }
+                    message = "Blood stock updated successfully!";
+                    res.render('update_blood_stock', { message });
+                });
+            }
+        } else {
+            // Add new blood type record if it doesn't exist
+            if (parseInt(units_change) > 0) {
+                const insertSql = 'INSERT INTO blood_stock (blood_type, units_available) VALUES (?, ?)';
+                db.query(insertSql, [blood_type, units_change], (err) => {
+                    if (err) {
+                        console.error('Error adding record: ' + err.stack);
+                        return res.status(500).send('Error adding record');
+                    }
+                    message = "New blood type added successfully!";
+                    res.render('update_blood_stock', { message });
+                });
+            } else {
+                message = "Error: You cannot add a negative number of units for a new blood type.";
+                res.render('update_blood_stock', { message });
+            }
+        }
+    });
+});
+
+// Route to render the form
+app.get('/update_blood_stock', (req, res) => {
+    res.render('update_blood_stock', { message: '' });
+});
+
+// Start the server
+app.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}`);
+});
