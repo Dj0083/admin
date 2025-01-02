@@ -1,52 +1,78 @@
+// server.js
 const express = require('express');
-const mysql = require('mysql');
 const bodyParser = require('body-parser');
-const path = require('path');
-
+const connection = require('./db');
 const app = express();
-const PORT = 3000;
-
-// MySQL Connection
-const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: '', // Replace with your MySQL password
-    database: 'your_database_name', // Replace with your database name
-});
-
-db.connect((err) => {
-    if (err) {
-        console.error('Database connection failed: ' + err.stack);
-        return;
-    }
-    console.log('Connected to database.');
-});
 
 // Middleware
-app.use(bodyParser.urlencoded({ extended: true })); // Parse URL-encoded bodies
-app.use(bodyParser.json()); // Parse JSON bodies
-app.use(express.static(path.join(__dirname, 'public'))); // Serve static files (CSS, JS)
+app.use(bodyParser.urlencoded({ extended: false }));
+app.set('view engine', 'ejs');
+app.use(express.static('public'));
 
-// Render Add Staff Form (GET Request)
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'add_staff.html'));
+// Routes
+
+// Add or Edit Donor
+app.get('/edit-donor', (req, res) => {
+    const donorId = req.query.id;
+    if (donorId) {
+        // Fetch donor details from the database
+        connection.query('SELECT * FROM donors WHERE id = ?', [donorId], (err, results) => {
+            if (err) {
+                return res.send('Error fetching donor data');
+            }
+            if (results.length > 0) {
+                res.render('edit-donor', { donor: results[0], message: '' });
+            } else {
+                res.send('Donor not found');
+            }
+        });
+    } else {
+        res.render('edit-donor', { donor: {}, message: '' });
+    }
 });
 
-// Handle Add Staff Form Submission (POST Request)
-app.post('/add-staff', (req, res) => {
-    const { name, role, contact_number, email, status } = req.body;
+// Handle form submission (Add/Update)
+app.post('/edit-donor', (req, res) => {
+    const { name, email, phone_number, blood_type, last_donation, donor_id } = req.body;
 
-    const sql = `INSERT INTO staff (name, role, contact_number, email, status) VALUES (?, ?, ?, ?, ?)`;
-    db.query(sql, [name, role, contact_number, email, status], (err, result) => {
+    if (donor_id) {
+        // Update donor data
+        connection.query(
+            'UPDATE donors SET name = ?, email = ?, phone_number = ?, blood_type = ?, last_donation = ? WHERE id = ?',
+            [name, email, phone_number, blood_type, last_donation, donor_id],
+            (err, results) => {
+                if (err) {
+                    return res.send('Error updating donor: ' + err.message);
+                }
+                res.redirect('/view-donors');
+            }
+        );
+    } else {
+        // Add new donor data
+        connection.query(
+            'INSERT INTO donors (name, email, phone_number, blood_type, last_donation) VALUES (?, ?, ?, ?, ?)',
+            [name, email, phone_number, blood_type, last_donation],
+            (err, results) => {
+                if (err) {
+                    return res.send('Error adding donor: ' + err.message);
+                }
+                res.redirect('/view-donors');
+            }
+        );
+    }
+});
+
+// View Donors
+app.get('/view-donors', (req, res) => {
+    connection.query('SELECT * FROM donors', (err, results) => {
         if (err) {
-            console.error(err);
-            return res.status(500).send(`<div class="alert alert-danger">Error: ${err.message}</div>`);
+            return res.send('Error fetching donors');
         }
-        res.send(`<div class="alert alert-success">New staff added successfully.</div>`);
+        res.render('view-donors', { donors: results });
     });
 });
 
 // Start the server
-app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+app.listen(3000, () => {
+    console.log('Server is running on http://localhost:3000');
 });
